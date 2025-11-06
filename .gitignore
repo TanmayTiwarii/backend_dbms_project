@@ -1,0 +1,48 @@
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# IDE / Editor junk
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Optional backups or generated files
+*.sqlite
+*.sql~
+*.backup
+
+# Debug / profiling output
+*.tgz
+npm-debug.log*
