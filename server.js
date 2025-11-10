@@ -1,34 +1,42 @@
-// server.js
-const express = require('express');
-const dotenv = require('dotenv');
-const usersRouter = require('./routes/users');
-
+import express from 'express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import { pool } from './config/db.js';
 
 dotenv.config();
 const app = express();
 app.use(express.json());
+app.use(cors());
 
-
-// Basic logger
-app.use((req, res, next) => {
-console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-next();
+app.get('/api/report', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        // const result = await client.query('SELECT * FROM complaints');
+        // res.json(result.rows);
+        // console.log(result.rows);
+        const tablesRes = await client.query(`
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public';
+        `); 
+        const allData = {};
+        for (const row of tablesRes.rows) {
+            const table = row.table_name;
+            const { rows: tableRows } = await client.query(`SELECT * FROM ${table}`);
+            allData[table] = tableRows;
+        }
+        console.log(JSON.stringify(allData, null, 2)); // Pretty print
+        res.json(allData);
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+        client.release();
+    }
 });
 
+const PORT = process.env.PORT || 5000;
 
-app.use('/api/users', usersRouter);
-
-
-// 404
-app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-
-
-// Global error handler (fallback)
-app.use((err, req, res, next) => {
-console.error('Unhandled error:', err);
-res.status(500).json({ error: 'Internal Server Error' });
+app.listen(PORT, () => {
+    console.log(`Server is running at http://localhost:${PORT}`);
 });
-
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

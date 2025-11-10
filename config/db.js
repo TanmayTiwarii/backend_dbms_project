@@ -1,18 +1,13 @@
-const mysql = require('mysql2/promise');
-const dotenv = require('dotenv');
+import pg from 'pg';
+import dotenv from 'dotenv';
+
 dotenv.config();
 
+const { Pool } = pg;
 
-const pool = mysql.createPool({
-host: process.env.DB_HOST || 'localhost',
-port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
-user: process.env.DB_USER || 'root',
-password: process.env.DB_PASSWORD || '',
-database: process.env.DB_NAME || 'express_mysql_demo',
-waitForConnections: true,
-connectionLimit: 10,
-queueLimit: 0
+const connectionString = process.env.PG_CONNECTION_STRING;
+
+// Export a single, shared connection pool for your entire application
+export const pool = new Pool({
+    connectionString: connectionString,
 });
-
-
-module.exports = pool;
