@@ -8,6 +8,28 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+app.get('/api/all', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const tablesRes = await client.query(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public';
+        `);
+
+        const allData = {};
+
+        for (const row of tablesRes.rows) {
+        const table = row.table_name;
+        const { rows: tableRows } = await client.query(`SELECT * FROM ${table}`);
+        allData[table] = tableRows;
+        }
+        res.json(allData);
+    } finally {
+        client.release();
+    }
+});
+
 app.get('/api/report', async (req, res) => {
     const client = await pool.connect();
     try {
