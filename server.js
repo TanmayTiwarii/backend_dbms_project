@@ -95,6 +95,79 @@ app.get('/api/report', async (req, res) => {
     }
 });
 
+// POST endpoint to accept and insert complaint data
+app.post('/api/report', async (req, res) => {
+    const payload = req.body;
+    const items = Array.isArray(payload) ? payload : [payload];
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+        const inserted = [];
+
+        for (const item of items) {
+            const complaintId = item.id;
+            const studentView = item.student_view || {};
+            const adminView = item.admin_view || {};
+
+            const description = studentView.complaint || null;
+            const severity = studentView.severity || null;
+            const created_at = studentView.timestamp || null;
+            const status = studentView.status || null;
+
+            // Get department name from adminView.departments[0]
+            const deptName = Array.isArray(adminView.departments) && adminView.departments.length > 0
+                ? adminView.departments[0]
+                : null;
+
+            // Insert complaint with JOIN to get dept_id from departments table
+            const insertResult = await client.query(
+                `INSERT INTO complaints (complaint_id, description, status, severity, created_at, resolved_at, is_archived, dept_id)
+                 SELECT $1, $2, $3, $4, $5, NULL, false, d.dept_id
+                 FROM departments d
+                 WHERE d.dept_name = $6
+                 ON CONFLICT (complaint_id) DO UPDATE SET 
+                    description = EXCLUDED.description,
+                    status = EXCLUDED.status,
+                    severity = EXCLUDED.severity,
+                    created_at = EXCLUDED.created_at,
+                    dept_id = EXCLUDED.dept_id
+                 RETURNING complaint_id, dept_id`,
+                [complaintId, description, status, severity, created_at, deptName]
+            );
+
+            if (insertResult.rows.length > 0) {
+                inserted.push({
+                    complaint_id: insertResult.rows[0].complaint_id,
+                    dept_id: insertResult.rows[0].dept_id,
+                    status: 'success'
+                });
+            } else {
+                inserted.push({
+                    complaint_id: complaintId,
+                    status: 'failed',
+                    reason: `Department '${deptName}' not found`
+                });
+            }
+        }
+
+        await client.query('COMMIT');
+        res.status(201).json({
+            message: 'Insert operation completed',
+            results: inserted
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error inserting complaints:', err);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            details: err.message
+        });
+    } finally {
+        client.release();
+    }
+});
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
