@@ -39,6 +39,7 @@ app.get('/api/report', async (req, res) => {
                 c.description,
                 c.status,
                 c.severity,
+                c.student_id,
                 c.created_at,
                 c.dept_id,
                 d.dept_name
@@ -63,6 +64,7 @@ app.get('/api/report', async (req, res) => {
             return {
                 id: complaint.complaint_id,
                 category,
+                stud_id: complaint.student_id,
                 student_view: {
                     complaint: complaint.description,
                     departments: complaint.dept_name ? [complaint.dept_name] : null,
@@ -134,25 +136,27 @@ app.post('/api/report', async (req, res) => {
 
             // Insert complaint with JOIN to get dept_id from departments table
             const insertResult = await client.query(
-                     `INSERT INTO complaints (
+                `INSERT INTO complaints (
                     complaint_id, description, status, severity, created_at, 
                     resolved_at, is_archived, dept_id, student_id
                    )
-                    SELECT 
+                 SELECT 
                     $1, $2, $3, $4, $5, 
                     NULL, false, d.dept_id, 
-                    (SELECT student_id FROM students WHERE roll_number = $7)
-                    FROM departments d
-                    WHERE d.dept_name = $6
-                    ON CONFLICT (complaint_id) DO UPDATE SET 
+                    (SELECT user_id FROM users WHERE name = $7)
+                 FROM departments d
+                 WHERE d.dept_name = $6
+                 ON CONFLICT (complaint_id) DO UPDATE SET 
                     description = EXCLUDED.description,
                     status = EXCLUDED.status,
-                    severity = EXCLUDED.severity, created_at = EXCLUDED.created_at,    dept_id = EXCLUDED.dept_id,
+                    severity = EXCLUDED.severity,
+                    created_at = EXCLUDED.created_at,
+                   dept_id = EXCLUDED.dept_id,
                     student_id = EXCLUDED.student_id
-                    RETURNING complaint_id, dept_id, student_id`,
-                    // The parameter array now includes studentRollNumber
-                    [complaintId, description, status, severity, created_at, deptName, studentRollNumber]
-                );
+                 RETURNING complaint_id, dept_id, student_id`,
+                // $7 is the 'studentRollNumber'
+                [complaintId, description, status, severity, created_at, deptName, studentRollNumber]
+            );
 
             if (insertResult.rows.length > 0) {
                 inserted.push({
