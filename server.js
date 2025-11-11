@@ -1270,6 +1270,88 @@ app.get('/health', async (req, res) => {
 
     res.json(status);
 });
+// Route: Get Complaints by Status
+
+app.get('/api/complaints/status/:status', async (req, res) => {
+    try {
+        const status = req.params.status.toLowerCase();
+        const result = await pool.query(
+            `SELECT c.*, u.name AS student_name, d.dept_name
+             FROM complaints c
+             JOIN users u ON c.student_id = u.user_id
+             JOIN departments d ON c.dept_id = d.dept_id
+             WHERE c.status = $1
+             ORDER BY c.created_at DESC;`,
+            [status]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('❌ Error fetching complaints by status:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+
+// Route: Get Complaints by Severity
+
+app.get('/api/complaints/severity/:level', async (req, res) => {
+    try {
+        const level = req.params.level.toLowerCase();
+        const severityMap = { low: 1, medium: 2, high: 3 };
+        const severity = severityMap[level];
+
+        if (!severity) {
+            return res.status(400).json({ error: 'Invalid severity level' });
+        }
+
+        const result = await pool.query(
+            `SELECT c.*, u.name AS student_name, d.dept_name
+             FROM complaints c
+             JOIN users u ON c.student_id = u.user_id
+             JOIN departments d ON c.dept_id = d.dept_id
+             WHERE c.severity = $1
+             ORDER BY c.created_at DESC;`,
+            [severity]
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('❌ Error fetching complaints by severity:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// Route: Get Complaints by Both Status & Severity
+
+app.get('/api/complaints/status/:status/severity/:level', async (req, res) => {
+    try {
+        const status = req.params.status.toLowerCase();
+        const level = req.params.level.toLowerCase();
+        const severityMap = { low: 1, medium: 2, high: 3 };
+        const severity = severityMap[level];
+
+        if (!severity) {
+            return res.status(400).json({ error: 'Invalid severity level' });
+        }
+
+        const result = await pool.query(
+            `SELECT c.*, u.name AS student_name, d.dept_name
+             FROM complaints c
+             JOIN users u ON c.student_id = u.user_id
+             JOIN departments d ON c.dept_id = d.dept_id
+             WHERE c.status = $1 AND c.severity = $2
+             ORDER BY c.created_at DESC;`,
+            [status, severity]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('❌ Error fetching complaints by status & severity:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 const PORT = process.env.PORT || 5001;
 
