@@ -232,13 +232,12 @@ app.post('/api/report', async (req, res) => {
             const complaintId = item.id;
             const studentView = item.student_view || {};
             const adminView = item.admin_view || {};
-
+            let status = studentView.status ? studentView.status.toLowerCase() : null;
             const description = studentView.complaint || adminView.complaint || null;
             const severity = adminView.severity || studentView.severity || 3;
             const created_at = studentView.timestamp || adminView.timestamp || new Date();
-            
+            const studentRollNumber = item.student_roll_number || null;
             // FIX: Map status to valid enum values (lowercase or specific format your DB expects)
-            let status = studentView.status || adminView.status || 'pending';
             status = status.toLowerCase(); // Convert "Pending" to "pending"
 
             // Get department name from adminView.departments[0]
@@ -248,8 +247,14 @@ app.post('/api/report', async (req, res) => {
 
             // Insert complaint with JOIN to get dept_id from departments table
             const insertResult = await client.query(
-                `INSERT INTO complaints (complaint_id, description, status, severity, created_at, resolved_at, is_archived, dept_id)
-                 SELECT $1, $2, $3, $4, $5, NULL, false, d.dept_id
+                `INSERT INTO complaints (
+                    complaint_id, description, status, severity, created_at, 
+                    resolved_at, is_archived, dept_id, student_id
+                   )
+                 SELECT 
+                    $1, $2, $3, $4, $5, 
+                    NULL, false, d.dept_id, 
+                    (SELECT user_id FROM users WHERE name = $7)
                  FROM departments d
                  WHERE d.dept_name = $6
                  ON CONFLICT (complaint_id) DO UPDATE SET 
@@ -257,9 +262,11 @@ app.post('/api/report', async (req, res) => {
                     status = EXCLUDED.status,
                     severity = EXCLUDED.severity,
                     created_at = EXCLUDED.created_at,
-                    dept_id = EXCLUDED.dept_id
-                 RETURNING complaint_id, dept_id`,
-                [complaintId, description, status, severity, created_at, deptName]
+                   dept_id = EXCLUDED.dept_id,
+                    student_id = EXCLUDED.student_id
+                 RETURNING complaint_id, dept_id, student_id`,
+                // $7 is the 'studentRollNumber'
+                [complaintId, description, status, severity, created_at, deptName, studentRollNumber]
             );
 
             if (insertResult.rows.length > 0) {
