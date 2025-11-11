@@ -106,15 +106,15 @@ app.post('/api/report', async (req, res) => {
         const inserted = [];
 
         for (const item of items) {
+            console.log('Processing item:', item);
             const complaintId = item.id;
             const studentView = item.student_view || {};
             const adminView = item.admin_view || {};
-
+            const studentRollNumber = item.student_roll_number || null;
             const description = studentView.complaint || null;
             const severity = studentView.severity || null;
             const created_at = studentView.timestamp || null;
-            const status = studentView.status || null;
-
+            const status = studentView.status ? studentView.status.toLowerCase() : null;
             // Get department name from adminView.departments[0]
             const deptName = Array.isArray(adminView.departments) && adminView.departments.length > 0
                 ? adminView.departments[0]
@@ -134,19 +134,25 @@ app.post('/api/report', async (req, res) => {
 
             // Insert complaint with JOIN to get dept_id from departments table
             const insertResult = await client.query(
-                `INSERT INTO complaints (complaint_id, description, status, severity, created_at, resolved_at, is_archived, dept_id)
-                 SELECT $1, $2, $3, $4, $5, NULL, false, d.dept_id
-                 FROM departments d
-                 WHERE d.dept_name = $6
-                 ON CONFLICT (complaint_id) DO UPDATE SET 
+                     `INSERT INTO complaints (
+                    complaint_id, description, status, severity, created_at, 
+                    resolved_at, is_archived, dept_id, student_id
+                   )
+                    SELECT 
+                    $1, $2, $3, $4, $5, 
+                    NULL, false, d.dept_id, 
+                    (SELECT student_id FROM students WHERE roll_number = $7)
+                    FROM departments d
+                    WHERE d.dept_name = $6
+                    ON CONFLICT (complaint_id) DO UPDATE SET 
                     description = EXCLUDED.description,
                     status = EXCLUDED.status,
-                    severity = EXCLUDED.severity,
-                    created_at = EXCLUDED.created_at,
-                    dept_id = EXCLUDED.dept_id
-                 RETURNING complaint_id, dept_id`,
-                [complaintId, description, status, severity, created_at, deptName]
-            );
+                    severity = EXCLUDED.severity, created_at = EXCLUDED.created_at,    dept_id = EXCLUDED.dept_id,
+                    student_id = EXCLUDED.student_id
+                    RETURNING complaint_id, dept_id, student_id`,
+                    // The parameter array now includes studentRollNumber
+                    [complaintId, description, status, severity, created_at, deptName, studentRollNumber]
+                );
 
             if (insertResult.rows.length > 0) {
                 inserted.push({
